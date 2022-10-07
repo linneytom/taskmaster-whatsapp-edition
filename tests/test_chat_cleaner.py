@@ -1,6 +1,7 @@
 import unittest
 from unittest import mock
 from cleaners.chat_cleaner import RawChatCleaner
+from pandas.api.types import is_datetime64_any_dtype
 
 class TestRawChatCleaner(unittest.TestCase):
     ### load_chat_file ###
@@ -404,9 +405,34 @@ class TestRawChatCleaner(unittest.TestCase):
         output = cleaner.attempt_split_message_into_author_and_content(message_data)
         self.assertEqual(output, expected, "expected a tuple of two strings, specifically this: (' - Ezmay', ': Self esteem)")
 
-    def format_timestamp_test(self):
+    def test_format_timestamp(self):
         """ 
         same as test_split_by_timestamps, this doesnt really need testing i dont think
         """
         pass
+
+    def test_clean_data_types(self):
+        """ 
+        checks that data types in the matrix are correct
+
+        timestamp (pd.datetime),
+        author (str),
+        is_event (bool),
+        message (str)
+
+        they are all in a pandas DataFrame object (explicitly, so not checking that aswell)
+
+
+        this is an integration test but badly organised with unit testing
+        """
+        chat_loc_data = "tests/test_data/txt_chat_test.txt"
+
+        cleaner = RawChatCleaner(
+            chat_loc = chat_loc_data
+        )
+
+        expected = ['<M8[ns]', 'O', 'bool', 'O']
+        output_chat = cleaner.clean()
+        output = [output_chat[col].dtypes for col in output_chat.columns]
+        self.assertEqual(output, expected, f"expected Series to be int, str, bool, datetime. Instead we got: {output}")
 
