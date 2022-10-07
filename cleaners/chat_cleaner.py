@@ -1,10 +1,12 @@
 import re
 from datetime import datetime
+import pandas as pd
+import emoji
 
 
 class RawChatCleaner():
 
-    def __init__(self, chat_loc):
+    def __init__(self, chat_loc, contact_dict = {}):
         """ 
         cleaner for the raw chat.txt exported from whatsapp
 
@@ -15,8 +17,11 @@ class RawChatCleaner():
         TODO: remove media ommited messages and other events
         """
         self.chat_loc = chat_loc
-        self.raw_chat = open(self.chat_loc, "r").read()
-        self.chat = self.decode_chat(self.raw_chat)
+        self.contact_dict = contact_dict
+        self.chat_with_emojis = self.load_chat_file()
+        self.chat = self.translate_emojis(self.chat_with_emojis)
+
+        # TODO: need to check this, i think it should be \d{2} rather than \d{0,9}
         self.timestamp_regexp = re.compile(
             r"(\d{0,9}\/\d{0,9}\/\d{0,9},\s\d{0,9}:\d{0,9})"
         )
@@ -26,14 +31,73 @@ class RawChatCleaner():
         self.quotation_regexp = re.compile(
             r"\""
         )
+        self.media_ommited_regexp = re.compile(
+            r"(?:<Media omitted>)"
+        )
+        self.newline_regexp = re.compile(
+            r"(?:\n)" # not sure why we dont need an additional \ here
+        )
+
+    def load_chat_file(self):
+        """ 
+        loads the chat
+
+        return str
+        """
+        return open(self.chat_loc, "r").read()
+
+    def translate_emojis(self, encoded_chat):
+        """ 
+        transforms emojis into text
+
+        encoded_chat (st): chat
+
+        return str
+        """
+        translated_emoji_chat = emoji.demojize(
+            encoded_chat,
+            delimiters = (" :", ": ")
+        )
+        return translated_emoji_chat
+    
+    def replace_user_phone_numbers_with_names(self, str_):
+        """ 
+        uses a regexp to locate and replace the number of an chat member with their name. this data needs to be supplied by the user of the program as there is no reliable datasource for linking these user descriptors
+
+        contact_dict (dict): name<str>: phone_number<str|int>
+        """
+
+        for name, number in self.contact_dict.items():
+            regexp = re.compile(f"(?:@{number})")
+            if regexp.search(str_):
+                str_ = regexp.sub(name, str_)
+        return str_
+
+    def substitute_strs(self, str_):
+        """ 
+        replaces some txt elements with easier tokenizable versions or with the contact_dict
+
+        this has to be done after most of the cleaning as the \n char can be used for splitting messages
+        """
+        str_ = self.media_ommited_regexp.sub(
+            "__Media_Omitted__",
+            str_
+        )
+        str_ = self.newline_regexp.sub(
+            ". ",
+            str_
+        )
+        if len(self.contact_dict) > 0:
+            str_ = self.replace_user_phone_numbers_with_names(str_)
+        return str_
     
     def clean(self):
         """ 
-        returns a matrix of the chat data with the following columns
+        returns a dataframe of the chat data with the following columns
 
-        timestamp (datetime), author (str), is_event (bool), message (str)
+        timestamp (datetime), author (str), is_event (bool), message (str), time_since_previous_message (timedelta), previous_message_author (str)
 
-        return list<list>
+        return pd.DataFrame
         """
         splitted_chat = self.split_by_timestamps()
         chat_matrix = []
@@ -47,27 +111,26 @@ class RawChatCleaner():
                     self.str_cleaner(msg, "event" if author=="" else "message")
                 ]
             )
-        return chat_matrix
+        chat_data = pd.DataFrame(
+            chat_matrix,
+            columns = [
+                "timestamp",
+                "author",
+                "is_event",
+                "message"
+            ]
+        )
+
+        return chat_data
     
     def str_cleaner(self, str_, str_type):
         """ 
         removes the leading ' - ' from the author
         """
         if (str_type == "event") or (str_type == "author"):
-            return str_[3:]
+            return self.substitute_strs(str_[3:])
         elif str_type == "message":
-            return str_[2:]
-
-    def decode_chat(self, chat):
-        """ 
-        removes unicode characters from the chat
-
-        chat (str): unprocessed chat string
-
-        returns str
-        """
-        chat_unicoded = chat.encode("ascii", "ignore")
-        return chat_unicoded.decode()
+            return self.substitute_strs(str_[2:])
     
     def split_by_timestamps(self):
         """ 
@@ -90,7 +153,7 @@ class RawChatCleaner():
 
         splitted_chat (list<str>): a list representing the chat after it has been split by the timestamp_regexp
 
-        yield tuple<list<str>>
+        return tuple<list<str>>
         """
         timestamps = splitted_chat[::2]
         messages = splitted_chat[1::2]
