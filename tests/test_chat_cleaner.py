@@ -1,7 +1,7 @@
 import unittest
 from unittest import mock
 from cleaners.chat_cleaner import RawChatCleaner
-from pandas.api.types import is_datetime64_any_dtype
+import pandas as pd
 
 class TestRawChatCleaner(unittest.TestCase):
     ### load_chat_file ###
@@ -197,19 +197,31 @@ class TestRawChatCleaner(unittest.TestCase):
 
     def test_substitute_strs_catch_newline(self):
         """ 
-        check that correct regex matches for \n escape chars are made and replaced
+        check that correct regex matches for .\n escape chars are made and replaced
         """
         chat_loc_data = "tests/test_data/txt_with_nothing.txt"
-        chat_data = "\n <-remove this"
+        chat_data_full_stop_no_space = "its time to end this.\nthere is no time for spaces"
+        chat_data_full_stop_with_space_1 = "we have time.\n perhaps we should reconsider?"
+        chat_data_full_stop_with_space_2 = "we have time. \nperhaps we should reconsider?"
+        chat_data_no_stop = "ok your right\nthere is literally no time for space"
 
         cleaner = RawChatCleaner(
             chat_loc = chat_loc_data
         )
 
-        expected = ".  <-remove this"
-        output = cleaner.substitute_strs(chat_data)
+        expected_full_stop_no_space = "its time to end this. there is no time for spaces"
+        expected_full_stop_with_space = "we have time. perhaps we should reconsider?"
+        expected_no_stop = "ok your right. there is literally no time for space"
 
-        self.assertEqual(output, expected, f"expected only \n chars to be replaced, instead we got: {output}")
+        output_full_stop_no_space = cleaner.substitute_strs(chat_data_full_stop_no_space)
+        output_full_stop_with_space_1 = cleaner.substitute_strs(chat_data_full_stop_with_space_1)
+        output_full_stop_with_space_2 = cleaner.substitute_strs(chat_data_full_stop_with_space_2)
+        output_no_stop = cleaner.substitute_strs(chat_data_no_stop)
+
+        self.assertEqual(output_full_stop_no_space, expected_full_stop_no_space, f"received: {output_full_stop_no_space}")
+        self.assertEqual(output_full_stop_with_space_1, expected_full_stop_with_space, f"recieved: {output_full_stop_with_space_1}")
+        self.assertEqual(output_full_stop_with_space_2, expected_full_stop_with_space, f"recieved: {output_full_stop_with_space_2}")
+        self.assertEqual(output_no_stop, expected_no_stop, f"received: {output_no_stop}")
 
     @mock.patch.object(RawChatCleaner, "replace_user_phone_numbers_with_names")
     def test_substitute_strs_call_replace_user_phone_numbers_with_names(self, mock_replace_user_phone_numbers_with_names):
@@ -435,4 +447,116 @@ class TestRawChatCleaner(unittest.TestCase):
         output_chat = cleaner.clean()
         output = [output_chat[col].dtypes for col in output_chat.columns]
         self.assertEqual(output, expected, f"expected Series to be int, str, bool, datetime. Instead we got: {output}")
+
+    def test_cleaner(self):
+        """ 
+        integration test for whatsapp chat is cleaned properly
+
+        how do you actually organise integration tests? perhaps i should have moduals organised with unit functions and then wrapper moduals for the integration tests where they all come together?
+        """
+        chat_loc_data = "tests/test_data/txt_chat_test.txt"
+        contact_dict_data = { 
+            "tom":"5678"
+        }
+
+        cleaner = RawChatCleaner(
+            chat_loc = chat_loc_data,
+            contact_dict = contact_dict_data
+        )
+
+        expected = pd.DataFrame(
+            [
+                [
+                    pd.Timestamp(
+                        year=2021,
+                        month=9,
+                        day=27,
+                        hour=8,
+                        minute=54
+                    ), 
+                    "", 
+                    True, 
+                    "Messages and calls are end-to-end encrypted. No one outside of this chat, not even WhatsApp, can read or listen to them. Tap to learn more."
+                ],
+                [
+                    pd.Timestamp(
+                        year=2021,
+                        month=10,
+                        day=4,
+                        hour=20,
+                        minute=19
+                    ), 
+                    "Caroline", 
+                    False, 
+                    "tom I'm here will meet us asap"
+                ],
+                [
+                    pd.Timestamp(
+                        year=2021,
+                        month=10,
+                        day=14,
+                        hour=20,
+                        minute=40
+                    ), 
+                    "Ezmay", 
+                    False, 
+                    "Where are you guys??"
+                ],
+                [
+                    pd.Timestamp(
+                        year=2021,
+                        month=10,
+                        day=22,
+                        hour=20,
+                        minute=0
+                    ), 
+                    "Caroline", 
+                    False, 
+                    "We're aiming for 8:30 btw I actually can't remember if I ever told u guys!!  :loudly_crying_face: "
+                ],
+                [
+                    pd.Timestamp(
+                        year=2021,
+                        month=10,
+                        day=23,
+                        hour=15,
+                        minute=49
+                    ), 
+                    "tom",
+                    False,
+                    "__Media_Omitted__"
+                ],
+                [
+                    pd.Timestamp(
+                        year=2021,
+                        month=10,
+                        day=22,
+                        hour=20,
+                        minute=2
+                    ),
+                    "tom",
+                    False,
+                    "Where tho?"
+                ],
+                [
+                    pd.Timestamp(
+                        year=2022,
+                        month=10,
+                        day=3,
+                        hour=15,
+                        minute=48
+                    ),
+                    "",
+                    True,
+                    'You changed the subject from "celebrations" to "celebrations:"'
+                ]
+            ],
+            columns = [
+                "timestamp","author","is_event","message"
+            ]
+        )
+
+        output = cleaner.clean()
+
+        pd.testing.assert_frame_equal(output, expected)
 

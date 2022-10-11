@@ -34,10 +34,31 @@ class RawChatCleaner():
         self.media_ommited_regexp = re.compile(
             r"(?:<Media omitted>)"
         )
-        self.newline_regexp = re.compile(
-            r"(?:\n)" # not sure why we dont need an additional \ here
-        )
 
+        
+        self.newline_with_no_full_stop_and_space = re.compile(
+            r"(?:(?<![\.,\s])\n(?![\.,\s]))"
+        ) # -> replace with '. '
+        
+        self.newline_with_full_stop_no_space = re.compile(
+            r"(?:(?<=\.)\n(?!\s))"
+        ) # -> replace with ' '
+
+        self.newline_with_full_stop_and_space = re.compile(
+            r"(?:(?<=\.)\n(?=\s))"
+        ) # -> replace with ''
+
+        self.newline_with_full_stop_preceding_whitespace = re.compile(
+            r"(?:(?<=\.)\s+\n(?!\s))"
+        ) # -> replace with ' '
+
+        self.newline_at_end = re.compile(
+            r"(?:\n(?=$))"
+        ) # replace with ''
+
+        self.newline_ = re.compile(
+            r"(?:\n)"
+        ) # replace with '. '
     def load_chat_file(self):
         """ 
         loads the chat
@@ -83,7 +104,33 @@ class RawChatCleaner():
             "__Media_Omitted__",
             str_
         )
-        str_ = self.newline_regexp.sub(
+
+        str_ = self.newline_at_end.sub(
+            "",
+            str_
+        )
+         
+        str_ = self.newline_with_no_full_stop_and_space.sub(
+            ". ",
+            str_
+        )
+
+        str_ = self.newline_with_full_stop_no_space.sub(
+            " ",
+            str_
+        )
+
+        str_ = self.newline_with_full_stop_and_space.sub(
+            "",
+            str_
+        )
+
+        str_ = self.newline_with_full_stop_preceding_whitespace.sub(
+            " ",
+            str_
+        )
+        
+        str_ = self.newline_.sub(
             ". ",
             str_
         )

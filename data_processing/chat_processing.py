@@ -19,7 +19,7 @@ class MessageTextPreprocessor():
 
         ]
 
-    def number_to_string(self, str):
+    def number_to_string(self, str_):
         """ 
         translates integers as strings to their english counterpards 5->five
 
