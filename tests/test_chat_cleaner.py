@@ -530,13 +530,25 @@ class TestRawChatCleaner(unittest.TestCase):
                     pd.Timestamp(
                         year=2021,
                         month=10,
-                        day=22,
-                        hour=20,
-                        minute=2
+                        day=23,
+                        hour=15,
+                        minute=50
                     ),
                     "tom",
                     False,
                     "Where tho?"
+                ],
+                [
+                    pd.Timestamp(
+                        year=2021,
+                        month=10,
+                        day=23,
+                        hour=15,
+                        minute=55
+                    ),
+                    "tom",
+                    False,
+                    "Im heading with haste!"
                 ],
                 [
                     pd.Timestamp(
